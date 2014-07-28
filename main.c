@@ -18,7 +18,8 @@
   Serial pc(USBTX,USBRX);
   
   void initWifly()
-  {      
+  {     
+    can1.frequency(500000); 
         if(serial_spi.connected())
         {
             serial_spi.writeString("\r");
@@ -49,12 +50,49 @@
    {
        serial_spi.writeString("\rSendingSomething");
        pc.printf("SendingSomethingOnSerial");
-   }    
+   }
+   
+   std::string intToString(int i)
+    {
+        std::stringstream ss;
+        std::string s;
+        ss << std::hex << i;
+        s = (i == 0) ? "00" : ss.str();
+
+        return s;
+    }    
 
     void terminal()
     {
+        
+        
         while(1)
         {
+            if (can1.read(can_MsgRx))
+            {
+                pc.printf("RX");
+                
+                std::string _id = intToString(can_MsgRx.id);
+                std::string _DB0 = intToString(can_MsgRx.data[0]);
+                std::string _DB1 = intToString(can_MsgRx.data[1]);
+                std::string _DB2 = intToString(can_MsgRx.data[2]);
+                std::string _DB3 = intToString(can_MsgRx.data[3]);
+                std::string _DB4 = intToString(can_MsgRx.data[4]);
+                std::string _DB5 = intToString(can_MsgRx.data[5]);
+                std::string _DB6 = intToString(can_MsgRx.data[6]);
+                std::string _DB7 = intToString(can_MsgRx.data[7]);
+                
+                string str = "<" + _id + " " + _DB0 + " " + _DB1 + " " + _DB2  + " " + _DB3 + " " + _DB4 + " " + _DB5 + " " + _DB6 + " " + _DB7 + ">\r";
+                std::string id = str;
+                char * writable = new char[str.size() + 1];
+                std::copy(str.begin(), str.end(), writable);
+                writable[str.size()] = '\0'; // don't forget the terminating 0
+                pc.printf("\n");
+                pc.printf(writable);
+                serial_spi.writeString(writable);
+                delete[] writable;
+            }
+            
             while(serial_spi.readable())
             {
                 pc.printf("%c", serial_spi.getc());
@@ -82,10 +120,9 @@
             {
             // When sending a message to the PC, send a couple of sync bytes so that when the PC looks, it finds the start of a message
             // putc will write a character/byte to the pc, getc reads a character/byte from the pc
-                pc.printf("Got message %d",can_MsgRx.data[0]);
+                pc.printf("RX %d",can_MsgRx.data[0]);
                 
                 int a = can_MsgRx.data[0];
-                pc.printf("%d", can_MsgRx.data[0]);
                 stringstream ss;
                 ss << a;
                 string str = "\rID: " + ss.str()+"\r";
@@ -106,7 +143,7 @@
         
         pc.printf("\nHello World!\n");
         initWifly();
-        startReading();
+        //startReading();
         terminal();
         //while(1)
         {
