@@ -15,6 +15,9 @@
   string port = "6001";
   string open = "open";
   
+  int buffer_pos = 0;
+  char buffer[50];
+  
   Serial pc(USBTX,USBRX);
   
   void initWifly()
@@ -48,8 +51,8 @@
    
    void sendSomething()
    {
-       serial_spi.writeString("\rSendingSomething");
-       pc.printf("SendingSomethingOnSerial");
+       //serial_spi.writeString("\rSendingSomething");
+       //pc.printf("SendingSomethingOnSerial");
    }
    
    std::string intToString(int i)
@@ -60,11 +63,63 @@
         s = (i == 0) ? "00" : ss.str();
 
         return s;
-    }    
+    }
+    
+    CANMessage makeCANMessage()
+    {
+        CANMessage can_m;
+        int space = 0;
+        for(int i = 4; i<buffer_pos; i++)
+        {
+            char c = (char)buffer[i];
+            if(c == ' ')
+            {
+                space = i;
+                break;
+            }
+        }    
+        string idStr(buffer, 4,space-4);
+        int id;
+        istringstream ( idStr ) >> id;
+        
+        char Cdata[8];
+        for(int i = 1; i < 9; i++)
+        {
+            pc.printf("\r\n %d", space);
+            string DBStr(buffer,(space+1),2);
+            pc.printf("%s\n",DBStr);
+            int DB;
+            istringstream (DBStr) >> DB;
+            //pc.printf("\r\n%d",DB);
+            space += 3;
+            
+            can_m.data[i-1] = DB;
+        }
+        can_m.id = id;
+        //can_m.data = Cdata;
+        can1.write(can_m);
+        //int id = std
+        return can_m;
+    }
+       
+    void handleInput()
+    {
+        pc.printf("\r\nbuffersize %d\r\n", buffer_pos);
+        pc.printf(buffer);
+        
+        CANMessage can_m = makeCANMessage();
+        
+        buffer[0] = '\0';
+        
+        buffer_pos = 0;
+        
+    }
+    
+        
 
     void terminal()
     {
-        
+        bool record = false;
         
         while(1)
         {
@@ -95,8 +150,39 @@
             
             while(serial_spi.readable())
             {
-                pc.printf("%c", serial_spi.getc());
+                //pc.printf("%d", serial_spi.getc());
+                //pc.printf("%c", serial_spi.getc());
+                
+                char c = (char)serial_spi.getc();
+                pc.printf("%c",c);
+                if(c == '<') //<
+                {
+                    pc.printf("got start");
+                    record = true;
+                } 
+                if(c == '>')// >
+                {
+                    pc.printf("got end");
+                    buffer[buffer_pos] = c;
+                    buffer_pos++;
+                    handleInput();
+                    record = false;
+                }
+                
+                if(record == true)
+                {
+                    buffer[buffer_pos] = c;
+                    buffer_pos++;
+                }           
+                //pc.printf("%c", serial_spi.getc());
+                
             }
+            /*if(!serial_spi.readable() && buffer_pos > 28)
+            {
+                pc.printf("\n");
+                pc.printf(buffer);
+                handleInput();
+            }*/
         
             if(pc.readable())
             {
@@ -118,9 +204,7 @@
         while(1){
             if (can1.read(can_MsgRx))
             {
-            // When sending a message to the PC, send a couple of sync bytes so that when the PC looks, it finds the start of a message
-            // putc will write a character/byte to the pc, getc reads a character/byte from the pc
-                pc.printf("RX %d",can_MsgRx.data[0]);
+                //pc.printf("RX %d",can_MsgRx.data[0]);
                 
                 int a = can_MsgRx.data[0];
                 stringstream ss;
@@ -140,7 +224,8 @@
 }
     int main()
     {
-        
+        pc.printf("%d", '<');
+        pc.printf("%d", '>');
         pc.printf("\nHello World!\n");
         initWifly();
         //startReading();
